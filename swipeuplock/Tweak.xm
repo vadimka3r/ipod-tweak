@@ -18,7 +18,6 @@ static const void *kDrawerKey = &kDrawerKey;
 static const void *kDrawerIconsKey = &kDrawerIconsKey;
 static const void *kDrawerBtnDoneKey = &kDrawerBtnDoneKey;
 static const void *kBlockWindowKey = &kBlockWindowKey;
-static const void *kBlockTimerKey = &kBlockTimerKey;
 
 static int tapCount = 0;
 static NSTimeInterval lastTapTime = 0;
@@ -620,7 +619,13 @@ static void baza_collectIconViews(UIView *view, NSMutableArray *out) {
     %orig;
 
     UIWindow *block = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    block.windowLevel = 10000000.0; /* выше UIWindowLevelAlert (2000) и всего остального */
+    /* Раньше здесь стояло 10000000.0 — экстремальное значение, которое,
+     * похоже, со временем конфликтовало с системным управлением подсветкой/
+     * блокировкой экрана (после нескольких respring'ов экран переставал
+     * включаться при живой системе). UIWindowLevelStatusBar+1 достаточно,
+     * чтобы быть выше домашнего экрана, но не выше системных алертов и
+     * механизмов блокировки экрана. */
+    block.windowLevel = UIWindowLevelStatusBar + 1.0;
     block.backgroundColor = [UIColor blackColor];
     block.userInteractionEnabled = YES;
 
@@ -634,15 +639,13 @@ static void baza_collectIconViews(UIView *view, NSMutableArray *out) {
     testos_uikit_set_root_view(block);
     testos_vm_start("/Library/TestOS/UITest.class");
 
-    /* Страховка: если что-то (входящий звонок/алерт/другой процесс) всё же
-     * перехватит key window — раз в секунду принудительно возвращаем наше
-     * окно на передний план. */
-    NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:1.0
-                                                        target:block
-                                                      selector:@selector(makeKeyAndVisible)
-                                                      userInfo:nil
-                                                       repeats:YES];
-    objc_setAssociatedObject(self, kBlockTimerKey, timer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    /* Убрали периодический таймер с принудительным makeKeyAndVisible каждую
+     * секунду навсегда — подозреваем, что именно он вызвал зависание
+     * подсветки экрана после нескольких циклов respring. Единичного вызова
+     * выше достаточно для нашего сценария (ничего в системе не должно
+     * перехватывать фокус, раз мы не запускаем других приложений). Если
+     * понадобится подстраховка — вернём точечно, реагируя на конкретное
+     * уведомление, а не вслепую раз в секунду. */
 }
 
 %end
