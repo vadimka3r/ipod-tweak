@@ -12,9 +12,17 @@
 
 #include "classfile.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Выполняет статический метод с заданным именем+дескриптором (аргументов
  * пока не передаём — не нужно для M1: main() всегда "()V"/"([Ljava/lang/String;)V").
  * Возвращает 0 при успехе, -1 при ошибке рантайма (печатает причину в stderr). */
 int interp_run_static(class_file_t *cf, const char *method_name, const char *descriptor);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

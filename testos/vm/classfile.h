@@ -10,6 +10,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
     CP_UTF8 = 1,
     CP_INTEGER = 3,
@@ -89,5 +93,9 @@ const char *cf_class_name(const class_file_t *cf, uint16_t class_index);
 
 /* Найти метод по имени+дескриптору (NULL если нет). */
 method_info_t *cf_find_method(const class_file_t *cf, const char *name, const char *descriptor);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
