@@ -633,21 +633,14 @@ static void baza_collectIconViews(UIView *view, NSMutableArray *out) {
 
     objc_setAssociatedObject(self, kBlockWindowKey, block, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-    /* ВРЕМЕННО (диагностика): метка напрямую из Tweak.xm, без всякой VM.
-     * Если это НЕ появится на экране — проблема в самом окне/хуке, а не в
-     * мосте к Java. Если появится — окно рисуется нормально, значит дело
-     * дальше, в VM/мосте. Убрать после того как разберёмся. */
-    UILabel *debugLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 10, 300, 30)];
-    debugLabel.text = @"[1] boot-block window OK";
-    debugLabel.textColor = [UIColor greenColor];
-    debugLabel.backgroundColor = [UIColor clearColor];
-    debugLabel.font = [UIFont systemFontOfSize:14];
-    [block addSubview:debugLabel];
-
-    /* M4: дальше уже наша мини-JVM рисует через UI.label/UI.button (см.
-     * testos/native-bridge/native_uikit.mm), поверх этой же метки. */
+    /* M4 подтверждён рабочим (диагностические метки сделали своё дело и
+     * убраны): мост Java-VM <-> UIKit исполняет реальный байткод и рисует
+     * через него. Дальше всё, что видно на экране, рисует Java-код через
+     * UI.label/UI.button (см. testos/native-bridge/native_uikit.mm), не
+     * Tweak.xm напрямую. Desktop.class — не одноразовый тест, а вечный
+     * цикл, живёт на экране постоянно (в отличие от UITest.class). */
     testos_uikit_set_root_view(block);
-    testos_vm_start("/Library/TestOS/UITest.class");
+    testos_vm_start("/Library/TestOS/Desktop.class");
 
     /* Убрали периодический таймер с принудительным makeKeyAndVisible каждую
      * секунду навсегда — подозреваем, что именно он вызвал зависание
