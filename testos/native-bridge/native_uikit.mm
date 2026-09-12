@@ -199,25 +199,21 @@ typedef struct {
 static void *vm_thread_main(void *arg) {
     vm_thread_args_t *args = (vm_thread_args_t *)arg;
 
-    /* ВРЕМЕННО (диагностика): видимые метки вместо логов — на устройстве
-     * лог не пишется (нет syslog/asl-файлов), поэтому единственный способ
-     * понять, где именно останавливается запуск — рисовать это на экране. */
-    host_ui_label(90, 10, 40, 300, 25, "[2] vm thread started");
-
     class_file_t *cf = classfile_load(args->class_path);
     if (!cf) {
-        host_ui_label(91, 10, 70, 300, 25, "[FAIL] classfile_load вернул NULL");
-        NSLog(@"[testos] не удалось загрузить %s", args->class_path);
+        /* На устройстве нет ни syslog, ни asl-файлов (проверено), поэтому
+         * ошибку загрузки класса показываем прямо на экране — иначе она
+         * молча теряется и выглядит как "ничего не произошло". */
+        char buf[256];
+        snprintf(buf, sizeof(buf), "[testos] не удалось загрузить %s", args->class_path);
+        host_ui_label(999, 10, 10, 300, 50, buf);
+        NSLog(@"%s", buf);
         free(args);
         return NULL;
     }
-    host_ui_label(92, 10, 70, 300, 25, "[3] class loaded OK");
 
     NSLog(@"[testos] запускаю %s.main()", cf->this_class_name);
-    int rc = interp_run_static(cf, "main", "([Ljava/lang/String;)V");
-    char buf[128];
-    snprintf(buf, sizeof(buf), "[4] main() rc=%d", rc);
-    host_ui_label(93, 10, 100, 300, 25, buf);
+    interp_run_static(cf, "main", "([Ljava/lang/String;)V");
     NSLog(@"[testos] %s.main() завершился", cf->this_class_name);
     classfile_free(cf);
     free(args);
