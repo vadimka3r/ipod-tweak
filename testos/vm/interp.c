@@ -1,4 +1,5 @@
 #include "interp.h"
+#include "native_host.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,29 +31,64 @@ static int16_t read_s2(const uint8_t *code, int pc) {
     return (int16_t)read_u2(code, pc);
 }
 
-/* Реализация "системных вызовов" — единственный способ Java-коду достучаться
- * до внешнего мира на этом этапе. В M4 сюда добавятся drawRect/onTouch и т.п.,
- * а на iOS они будут дёргать реальный UIKit через native-bridge. */
-static int call_native(const char *method_name, const char *descriptor, frame_t *caller, int arg_count) {
-    if (strcmp(method_name, "println") == 0 && strcmp(descriptor, "(I)V") == 0) {
-        int v = (int)caller->stack[caller->sp - 1];
-        printf("%d\n", v);
-        caller->sp -= arg_count;
-        return 0;
+/* Диспетчер "нативных" методов. Сам interp.c не знает, ЧТО происходит с
+ * данными дальше — печатаются они в консоль (native_console.c на Linux) или
+ * превращаются в реальный UIKit-виджет (native_uikit.mm на iOS): это решает
+ * host_*() из native_host.h, подставляемый на этапе линковки. */
+static int call_native(const char *class_name, const char *method_name, const char *descriptor,
+                        frame_t *caller, int arg_count) {
+    if (strcmp(class_name, "Native") == 0) {
+        if (strcmp(method_name, "println") == 0 && strcmp(descriptor, "(I)V") == 0) {
+            host_println_int((int)caller->stack[caller->sp - 1]);
+            caller->sp -= arg_count;
+            return 0;
+        }
+        if (strcmp(method_name, "print") == 0 && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
+            host_print_str((const char *)(intptr_t)caller->stack[caller->sp - 1]);
+            caller->sp -= arg_count;
+            return 0;
+        }
+        if (strcmp(method_name, "println") == 0 && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
+            host_println_str((const char *)(intptr_t)caller->stack[caller->sp - 1]);
+            caller->sp -= arg_count;
+            return 0;
+        }
     }
-    if (strcmp(method_name, "print") == 0 && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
-        const char *s = (const char *)(intptr_t)caller->stack[caller->sp - 1];
-        printf("%s", s ? s : "(null)");
-        caller->sp -= arg_count;
-        return 0;
+
+    if (strcmp(class_name, "UI") == 0) {
+        slot_t *a = &caller->stack[caller->sp - arg_count];
+        if (strcmp(method_name, "label") == 0 && strcmp(descriptor, "(IIIIILjava/lang/String;)V") == 0) {
+            host_ui_label((int)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (const char *)(intptr_t)a[5]);
+            caller->sp -= arg_count;
+            return 0;
+        }
+        if (strcmp(method_name, "button") == 0 && strcmp(descriptor, "(IIIIILjava/lang/String;)V") == 0) {
+            host_ui_button((int)a[0], (int)a[1], (int)a[2], (int)a[3], (int)a[4], (const char *)(intptr_t)a[5]);
+            caller->sp -= arg_count;
+            return 0;
+        }
+        if (strcmp(method_name, "setText") == 0 && strcmp(descriptor, "(ILjava/lang/String;)V") == 0) {
+            host_ui_set_text((int)a[0], (const char *)(intptr_t)a[1]);
+            caller->sp -= arg_count;
+            return 0;
+        }
+        if (strcmp(method_name, "remove") == 0 && strcmp(descriptor, "(I)V") == 0) {
+            host_ui_remove((int)a[0]);
+            caller->sp -= arg_count;
+            return 0;
+        }
+        if (strcmp(method_name, "pollEvent") == 0 && strcmp(descriptor, "()I") == 0) {
+            caller->stack[caller->sp++] = host_ui_poll_event();
+            return 0;
+        }
+        if (strcmp(method_name, "sleepMs") == 0 && strcmp(descriptor, "(I)V") == 0) {
+            host_sleep_ms((int)a[0]);
+            caller->sp -= arg_count;
+            return 0;
+        }
     }
-    if (strcmp(method_name, "println") == 0 && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
-        const char *s = (const char *)(intptr_t)caller->stack[caller->sp - 1];
-        printf("%s\n", s ? s : "(null)");
-        caller->sp -= arg_count;
-        return 0;
-    }
-    fprintf(stderr, "interp: неизвестный нативный метод Native.%s%s\n", method_name, descriptor);
+
+    fprintf(stderr, "interp: неизвестный нативный метод %s.%s%s\n", class_name, method_name, descriptor);
     return -1;
 }
 
@@ -227,8 +263,8 @@ static int exec_method(class_file_t *cf, method_info_t *m, slot_t *args, int nar
                 const char *mdesc = cf_utf8(cf, cf->constant_pool[nt_idx].u.name_and_type.descriptor_index);
                 int nargs_call = count_args(mdesc);
 
-                if (target_class && strcmp(target_class, "Native") == 0) {
-                    if (call_native(mname, mdesc, &frame, nargs_call) != 0) {
+                if (target_class && (strcmp(target_class, "Native") == 0 || strcmp(target_class, "UI") == 0)) {
+                    if (call_native(target_class, mname, mdesc, &frame, nargs_call) != 0) {
                         g_depth--; return -1;
                     }
                 } else if (target_class && strcmp(target_class, cf->this_class_name) == 0) {

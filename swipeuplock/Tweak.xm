@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import "../testos/native-bridge/native_uikit.h"
 
 static CGPoint startPoint;
 static BOOL tracking;
@@ -623,17 +624,15 @@ static void baza_collectIconViews(UIView *view, NSMutableArray *out) {
     block.backgroundColor = [UIColor blackColor];
     block.userInteractionEnabled = YES;
 
-    UILabel *label = [[UILabel alloc] initWithFrame:block.bounds];
-    label.text = @"testOS";
-    label.textColor = [UIColor whiteColor];
-    label.textAlignment = NSTextAlignmentCenter;
-    label.font = [UIFont boldSystemFontOfSize:32];
-    label.backgroundColor = [UIColor clearColor];
-    [block addSubview:label];
-
     [block makeKeyAndVisible];
 
     objc_setAssociatedObject(self, kBlockWindowKey, block, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    /* M4: вместо статичной надписи — отдаём окно нашей мини-JVM. Дальше всё,
+     * что видно на экране, рисует Java-код через UI.label/UI.button (см.
+     * testos/native-bridge/native_uikit.mm), а не Tweak.xm напрямую. */
+    testos_uikit_set_root_view(block);
+    testos_vm_start("/Library/TestOS/UITest.class");
 
     /* Страховка: если что-то (входящий звонок/алерт/другой процесс) всё же
      * перехватит key window — раз в секунду принудительно возвращаем наше
