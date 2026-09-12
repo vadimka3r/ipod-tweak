@@ -1,0 +1,8 @@
+Package: com.yourcompany.ipodik
+Name: ipodik
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: An awesome application!
+Maintainer: codespace
+Author: codespace
+Section: Utilities
