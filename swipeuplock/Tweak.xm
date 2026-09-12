@@ -16,6 +16,8 @@ static const void *kOrigFrameKey = &kOrigFrameKey;
 static const void *kDrawerKey = &kDrawerKey;
 static const void *kDrawerIconsKey = &kDrawerIconsKey;
 static const void *kDrawerBtnDoneKey = &kDrawerBtnDoneKey;
+static const void *kBlockWindowKey = &kBlockWindowKey;
+static const void *kBlockTimerKey = &kBlockTimerKey;
 
 static int tapCount = 0;
 static NSTimeInterval lastTapTime = 0;
@@ -594,6 +596,54 @@ static void baza_collectIconViews(UIView *view, NSMutableArray *out) {
 
     objc_setAssociatedObject(self, kDrawerKey, nil, OBJC_ASSOCIATION_RETAIN);
     objc_setAssociatedObject(self, kDrawerIconsKey, nil, OBJC_ASSOCIATION_RETAIN);
+}
+
+%end
+
+/*
+ * testOS boot-block: полноэкранное окно поверх абсолютно всего (домашний
+ * экран, страницы иконок, свайп между ними) сразу после старта SpringBoard.
+ * Пользователь физически не может добраться до штатного интерфейса iOS —
+ * визуально и по тачам его просто нет, хотя SpringBoard как процесс жив и
+ * штатно держит связь с backboardd/WindowServer (поэтому нет риска "чёрного
+ * экрана из-за краш-лупа", как было бы при подмене бинарника SpringBoard в
+ * launchd — так делать не будем, это гораздо рискованнее).
+ *
+ * Откат при проблемах — как обычно: удалить/переименовать
+ * com.baza.swipeuplock.dylib через файловый менеджер 3uTools (без SSH) или
+ * по SSH `mv`, затем `killall SpringBoard` или ребут.
+ */
+%hook SpringBoard
+
+- (void)applicationDidFinishLaunching:(id)application {
+    %orig;
+
+    UIWindow *block = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    block.windowLevel = 10000000.0; /* выше UIWindowLevelAlert (2000) и всего остального */
+    block.backgroundColor = [UIColor blackColor];
+    block.userInteractionEnabled = YES;
+
+    UILabel *label = [[UILabel alloc] initWithFrame:block.bounds];
+    label.text = @"testOS";
+    label.textColor = [UIColor whiteColor];
+    label.textAlignment = NSTextAlignmentCenter;
+    label.font = [UIFont boldSystemFontOfSize:32];
+    label.backgroundColor = [UIColor clearColor];
+    [block addSubview:label];
+
+    [block makeKeyAndVisible];
+
+    objc_setAssociatedObject(self, kBlockWindowKey, block, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    /* Страховка: если что-то (входящий звонок/алерт/другой процесс) всё же
+     * перехватит key window — раз в секунду принудительно возвращаем наше
+     * окно на передний план. */
+    NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                        target:block
+                                                      selector:@selector(makeKeyAndVisible)
+                                                      userInfo:nil
+                                                       repeats:YES];
+    objc_setAssociatedObject(self, kBlockTimerKey, timer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 %end
