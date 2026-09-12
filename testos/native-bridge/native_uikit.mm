@@ -64,11 +64,15 @@ static int pop_event(void) {
     return result;
 }
 
-static UIView *find_widget(int handle) {
+/* Возвращаем индекс, а не UIView* — на старом линкере Theos (armv7 + ARC)
+ * функция, возвращающая Objective-C объект, ловит ошибку компоновщика
+ * "armv7 has no pc-rel bx thumb instruction" из-за objc_autoreleaseReturnValue.
+ * Индекс — обычное int, эта проблема его не касается. */
+static int find_widget_index(int handle) {
     for (int i = 0; i < g_widget_count; i++) {
-        if (g_widgets[i].handle == handle) return g_widgets[i].view;
+        if (g_widgets[i].handle == handle) return i;
     }
-    return nil;
+    return -1;
 }
 
 /* Обработчик тапа по нашим кнопкам. tag на UIButton = handle (int),
@@ -101,10 +105,10 @@ void host_print_str(const char *s) {
 void host_ui_label(int handle, int x, int y, int w, int h, const char *text) {
     NSString *nstext = [NSString stringWithUTF8String:text ? text : ""];
     dispatch_sync(dispatch_get_main_queue(), ^{
-        UIView *existing = find_widget(handle);
-        if (existing && [existing isKindOfClass:[UILabel class]]) {
-            ((UILabel *)existing).text = nstext;
-            existing.frame = CGRectMake(x, y, w, h);
+        int idx = find_widget_index(handle);
+        if (idx >= 0 && [g_widgets[idx].view isKindOfClass:[UILabel class]]) {
+            ((UILabel *)g_widgets[idx].view).text = nstext;
+            g_widgets[idx].view.frame = CGRectMake(x, y, w, h);
             return;
         }
         UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(x, y, w, h)];
@@ -125,10 +129,10 @@ void host_ui_label(int handle, int x, int y, int w, int h, const char *text) {
 void host_ui_button(int handle, int x, int y, int w, int h, const char *text) {
     NSString *nstext = [NSString stringWithUTF8String:text ? text : ""];
     dispatch_sync(dispatch_get_main_queue(), ^{
-        UIView *existing = find_widget(handle);
-        if (existing && [existing isKindOfClass:[UIButton class]]) {
-            [(UIButton *)existing setTitle:nstext forState:UIControlStateNormal];
-            existing.frame = CGRectMake(x, y, w, h);
+        int idx = find_widget_index(handle);
+        if (idx >= 0 && [g_widgets[idx].view isKindOfClass:[UIButton class]]) {
+            [(UIButton *)g_widgets[idx].view setTitle:nstext forState:UIControlStateNormal];
+            g_widgets[idx].view.frame = CGRectMake(x, y, w, h);
             return;
         }
         UIButton *button = [UIButton buttonWithType:UIButtonTypeRoundedRect];
@@ -151,8 +155,9 @@ void host_ui_button(int handle, int x, int y, int w, int h, const char *text) {
 void host_ui_set_text(int handle, const char *text) {
     NSString *nstext = [NSString stringWithUTF8String:text ? text : ""];
     dispatch_sync(dispatch_get_main_queue(), ^{
-        UIView *v = find_widget(handle);
-        if (!v) return;
+        int idx = find_widget_index(handle);
+        if (idx < 0) return;
+        UIView *v = g_widgets[idx].view;
         if ([v isKindOfClass:[UILabel class]]) ((UILabel *)v).text = nstext;
         else if ([v isKindOfClass:[UIButton class]]) [(UIButton *)v setTitle:nstext forState:UIControlStateNormal];
     });
