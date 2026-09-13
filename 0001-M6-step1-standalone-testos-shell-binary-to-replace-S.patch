@@ -1,0 +1,222 @@
+From 969c487f46adaa99772197a17b6f7647b7e5bc40 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 13 Sep 2026 14:39:09 +0000
+Subject: [PATCH] M6 step1: standalone testos-shell binary to replace
+ SpringBoard launchd binary
+
+---
+ testos/shell/Makefile         |  11 +++
+ testos/shell/entitlements.xml | 135 ++++++++++++++++++++++++++++++++++
+ testos/shell/main.mm          |  40 ++++++++++
+ 3 files changed, 186 insertions(+)
+ create mode 100644 testos/shell/Makefile
+ create mode 100644 testos/shell/entitlements.xml
+ create mode 100644 testos/shell/main.mm
+
+diff --git a/testos/shell/Makefile b/testos/shell/Makefile
+new file mode 100644
+index 0000000..1e7f20e
+--- /dev/null
++++ b/testos/shell/Makefile
+@@ -0,0 +1,11 @@
++TARGET := iphone:clang:12.4:6.0
++ARCHS = armv7
++include $(THEOS)/makefiles/common.mk
++
++APPLICATION_NAME = testos-shell
++testos-shell_FILES = main.mm ../vm/classfile.c ../vm/interp.c ../native-bridge/native_uikit.mm
++testos-shell_CFLAGS = -fobjc-arc -I../vm -I../native-bridge
++testos-shell_FRAMEWORKS = UIKit CoreGraphics QuartzCore Foundation
++testos-shell_CODESIGN_FLAGS = -Sentitlements.xml
++
++include $(THEOS_MAKE_PATH)/application.mk
+diff --git a/testos/shell/entitlements.xml b/testos/shell/entitlements.xml
+new file mode 100644
+index 0000000..8e29908
+--- /dev/null
++++ b/testos/shell/entitlements.xml
+@@ -0,0 +1,135 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++	<key>allow-obliterate-device</key>
++	<true/>
++	<key>application-identifier</key>
++	<string>com.apple.springboard</string>
++	<key>aps-connection-initiate</key>
++	<true/>
++	<key>checklessPersistentURLTranslation</key>
++	<true/>
++	<key>com.apple.CommCenter.Preferences-delete</key>
++	<true/>
++	<key>com.apple.MobileInternetSharing.allow</key>
++	<true/>
++	<key>com.apple.SystemConfiguration.SCDynamicStore-write-access</key>
++	<true/>
++	<key>com.apple.SystemConfiguration.SCPreferences-write-access</key>
++	<array>
++		<string>com.apple.AutoWake.xml</string>
++		<string>preferences.plist</string>
++		<string>com.apple.radios.plist</string>
++	</array>
++	<key>com.apple.aosnotification.aosnotifyd-access</key>
++	<true/>
++	<key>com.apple.assistant.client</key>
++	<true/>
++	<key>com.apple.backboard.client</key>
++	<true/>
++	<key>com.apple.bulletinboard.observer</key>
++	<true/>
++	<key>com.apple.bulletinboard.settings</key>
++	<true/>
++	<key>com.apple.bulletinboard.systemstate</key>
++	<true/>
++	<key>com.apple.bulletinboard.utilities</key>
++	<true/>
++	<key>com.apple.cards.all-access</key>
++	<true/>
++	<key>com.apple.coremedia.allow-protected-content-playback</key>
++	<true/>
++	<key>com.apple.coretelephony.CTVoiceSupport.allow</key>
++	<true/>
++	<key>com.apple.iapd.accessibility</key>
++	<true/>
++	<key>com.apple.imagent.av</key>
++	<true/>
++	<key>com.apple.imagent.chat</key>
++	<true/>
++	<key>com.apple.itunesstored.private</key>
++	<true/>
++	<key>com.apple.keystore.device</key>
++	<true/>
++	<key>com.apple.locationd.authorizeapplications</key>
++	<true/>
++	<key>com.apple.locationd.effective_bundle</key>
++	<true/>
++	<key>com.apple.locationd.prompt_behavior</key>
++	<true/>
++	<key>com.apple.locationd.status</key>
++	<true/>
++	<key>com.apple.managedconfiguration.mdmd-access</key>
++	<true/>
++	<key>com.apple.managedconfiguration.profiled-access</key>
++	<true/>
++	<key>com.apple.mediastream.mstreamd-access</key>
++	<true/>
++	<key>com.apple.messages.composeclient</key>
++	<true/>
++	<key>com.apple.mobile.deleted.AllowFreeSpace</key>
++	<true/>
++	<key>com.apple.mobilemail.mailservices</key>
++	<true/>
++	<key>com.apple.multitasking.systemappassertions</key>
++	<true/>
++	<key>com.apple.multitasking.termination</key>
++	<true/>
++	<key>com.apple.private.accounts.allaccounts</key>
++	<true/>
++	<key>com.apple.private.allow-webviewcontroller</key>
++	<true/>
++	<key>com.apple.private.hid.manager.client</key>
++	<true/>
++	<key>com.apple.private.icfcallserver</key>
++	<true/>
++	<key>com.apple.private.imavcore.imavagent</key>
++	<true/>
++	<key>com.apple.private.imcore.imremoteurlconnection</key>
++	<true/>
++	<key>com.apple.private.kernel.jetsam</key>
++	<true/>
++	<key>com.apple.private.librarian.can-get-application-info</key>
++	<true/>
++	<key>com.apple.private.mobileinstall.allowedSPI</key>
++	<array>
++		<string>Uninstall</string>
++		<string>SetCapabilities</string>
++		<string>Lookup</string>
++	</array>
++	<key>com.apple.private.tcc.allow</key>
++	<array>
++		<string>kTCCServiceAddressBook</string>
++		<string>kTCCServiceCalendar</string>
++		<string>kTCCServiceReminders</string>
++		<string>kTCCServicePhotos</string>
++	</array>
++	<key>com.apple.private.ubiquity-kvstore-access</key>
++	<array>
++		<string>com.apple.weather</string>
++		<string>com.apple.stocks</string>
++	</array>
++	<key>com.apple.remotenotification.access</key>
++	<true/>
++	<key>com.apple.remotenotification.preferences</key>
++	<true/>
++	<key>com.apple.springboard.activateawayviewplugins</key>
++	<true/>
++	<key>com.apple.springboard.opensensitiveurl</key>
++	<true/>
++	<key>com.apple.timed</key>
++	<true/>
++	<key>com.apple.videoconference.allow-conferencing</key>
++	<true/>
++	<key>com.apple.wifi.manager-access</key>
++	<true/>
++	<key>keychain-access-groups</key>
++	<array>
++		<string>apple</string>
++		<string>com.apple.preferences</string>
++	</array>
++	<key>vm-pressure-level</key>
++	<true/>
++</dict>
++</plist>
+diff --git a/testos/shell/main.mm b/testos/shell/main.mm
+new file mode 100644
+index 0000000..b6fd04b
+--- /dev/null
++++ b/testos/shell/main.mm
+@@ -0,0 +1,40 @@
++/*
++ * main.mm — точка входа standalone-бинарника, который launchd запускает
++ * ВМЕСТО настоящего SpringBoard (мы физически подменяем файл по пути
++ * /System/Library/CoreServices/SpringBoard.app/SpringBoard, сам launchd
++ * job/plist не трогаем).
++ *
++ * Это НЕ твик — сюда не грузится MobileSubstrate, это первый процесс,
++ * который launchd поднимает после ядра для пользовательского интерфейса.
++ * Соответственно, никакого SBUIController/SpringBoard.app рядом уже нет —
++ * весь экран полностью наш с первого кадра.
++ */
++#import <UIKit/UIKit.h>
++#include "../vm/classfile.h"
++#include "../vm/interp.h"
++#include "native_uikit.h"
++
++@interface TestOSAppDelegate : NSObject <UIApplicationDelegate>
++@property (nonatomic, strong) UIWindow *window;
++@end
++
++@implementation TestOSAppDelegate
++
++- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
++    self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
++    self.window.backgroundColor = [UIColor blackColor];
++    [self.window makeKeyAndVisible];
++
++    testos_uikit_set_root_view(self.window);
++    testos_vm_start("/Library/TestOS/Desktop.class");
++
++    return YES;
++}
++
++@end
++
++int main(int argc, char *argv[]) {
++    @autoreleasepool {
++        return UIApplicationMain(argc, argv, nil, NSStringFromClass([TestOSAppDelegate class]));
++    }
++}
+-- 
+2.43.0
+
