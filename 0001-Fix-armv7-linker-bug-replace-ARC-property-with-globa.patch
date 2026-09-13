@@ -1,0 +1,47 @@
+From 5ae3f239637212488c6570027b8a971561bdfdd3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 13 Sep 2026 14:44:33 +0000
+Subject: [PATCH] Fix armv7 linker bug: replace ARC property with global var
+ for shell window
+
+---
+ testos/shell/main.mm | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/testos/shell/main.mm b/testos/shell/main.mm
+index b6fd04b..3666eeb 100644
+--- a/testos/shell/main.mm
++++ b/testos/shell/main.mm
+@@ -14,18 +14,24 @@
+ #include "../vm/interp.h"
+ #include "native_uikit.h"
+ 
++/* Не используем @property (strong) для окна — на старом линкере Theos
++ * (armv7 + ARC) синтезированный ARC-сеттер (objc_storeStrong) ловит ту же
++ * ошибку компоновщика "armv7 has no pc-rel bx thumb instruction", что мы
++ * уже видели с find_widget в native_uikit.mm. Обходим так же — обычная
++ * глобальная переменная вместо ARC-managed property/ivar. */
++static UIWindow *g_shell_window = nil;
++
+ @interface TestOSAppDelegate : NSObject <UIApplicationDelegate>
+-@property (nonatomic, strong) UIWindow *window;
+ @end
+ 
+ @implementation TestOSAppDelegate
+ 
+ - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+-    self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+-    self.window.backgroundColor = [UIColor blackColor];
+-    [self.window makeKeyAndVisible];
++    g_shell_window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
++    g_shell_window.backgroundColor = [UIColor blackColor];
++    [g_shell_window makeKeyAndVisible];
+ 
+-    testos_uikit_set_root_view(self.window);
++    testos_uikit_set_root_view(g_shell_window);
+     testos_vm_start("/Library/TestOS/Desktop.class");
+ 
+     return YES;
+-- 
+2.43.0
+
